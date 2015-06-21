@@ -30,7 +30,10 @@ macro_rules! urpc {
         pub enum Request {
             _SHUTDOWN,
             $(
-                $fn_name($( $arg_ty ),*),
+                // Note: we insert a dummy tuple type here at the beginning so
+                // that functions with no arguments don't trigger the error:
+                //   "nullary enum variants are written with no trailing `()`"
+                $fn_name((), $( $arg_ty ),*),
             )*
         }
 
@@ -63,7 +66,7 @@ macro_rules! urpc {
                 fn $fn_name(&mut self, $( $arg: $arg_ty ),*)
                     -> $crate::Result<$ret_ty>
                 {
-                    let req = Request::$fn_name($( $arg ),*);
+                    let req = Request::$fn_name((), $( $arg ),*);
                     try!($crate::rt::send(&mut self.stream, &req));
                     let ret = try!($crate::rt::recv(&mut self.stream));
                     Ok(ret)
@@ -80,7 +83,7 @@ macro_rules! urpc {
                 match try!($crate::rt::recv(&mut stream)) {
                     Request::_SHUTDOWN => return Ok(()),
                     $(
-                        Request::$fn_name($( $arg ),*) => {
+                        Request::$fn_name((), $( $arg ),*) => {
                             let ret = try!(handler.$fn_name($( $arg ),*));
                             try!($crate::rt::send(&mut stream, &ret));
                         }
