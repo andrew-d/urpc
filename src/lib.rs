@@ -5,6 +5,16 @@ extern crate bufstream;
 use std::{io, fmt, error, result};
 use bincode::rustc_serialize::{EncodingError, DecodingError};
 
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __urpc_expand_return {
+    // Base case
+    ( -> $ret_ty:ty ) => ($crate::Result<$ret_ty>);
+
+    // Case with no return type - switch to unit `()`
+    () =>                ($crate::Result<()>);
+}
+
 #[macro_export]
 macro_rules! urpc {
     (
@@ -14,14 +24,14 @@ macro_rules! urpc {
                     $(
                         $arg:ident: $arg_ty:ty
                     ),*
-                ) -> $ret_ty:ty {}
+                ) $( -> $ret_tok:ty )* {}
             )*
         }
     ) => { pub mod $mod_name {
         pub trait Methods {
             $(
                 fn $fn_name(&mut self, $( $arg: $arg_ty ),*)
-                    -> $crate::Result<$ret_ty>;
+                    -> __urpc_expand_return!($( -> $ret_tok )*);
             )*
         }
 
@@ -64,7 +74,7 @@ macro_rules! urpc {
         {
             $(
                 fn $fn_name(&mut self, $( $arg: $arg_ty ),*)
-                    -> $crate::Result<$ret_ty>
+                    -> __urpc_expand_return!($( -> $ret_tok )*)
                 {
                     let req = Request::$fn_name((), $( $arg ),*);
                     try!($crate::rt::send(&mut self.stream, &req));
